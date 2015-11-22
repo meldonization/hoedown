@@ -1401,6 +1401,8 @@ is_centerofline(uint8_t *data, size_t size)
     while (i < size && data[i] != '\n') {
         if (data[i-1] == '<' && data[i] == '-')
             n = 1;
+        if (data[i-2] == '<'  && data[i-1] == '-' && data[i] == ' ')
+            n = 1;
         i++;
     }
     
@@ -1821,46 +1823,46 @@ parse_blockcode(hoedown_buffer *ob, hoedown_document *doc, uint8_t *data, size_t
 /* parse the centerof line content mengzy */
 
 /* TO-DOs:
-   [ ] removing leading and trailing spaces!!
-   [ ] embeded formats like emphersize in inside of center!!
+   [x] removing trailing spaces!!
+   [x] embeded formats like emphersize in inside of center!!
  */
+
 static size_t
 parse_centerofline(hoedown_buffer *ob, hoedown_document *doc, uint8_t *data, size_t size)
 {
-    size_t beg = 0, end, i = 0;
-    hoedown_buffer *work;
+    size_t beg = 0, end, i , tmp = 2;
+    hoedown_buffer *work = 0, *inter = 0;
     
     work = newbuf(doc, BUFFER_BLOCK);
-    //worktmp = newbuf(doc, BUFFER_BLOCK);
+    inter = newbuf(doc, BUFFER_SPAN);
     
-    beg += 2; // skipping the prefix
+    beg += 2; // skipping the prefix '->'
     
     if (beg < size) {
         
-        for (end = beg + 1; end < size && data[end - 1] != '\n'; end++) {};
-        end -= 3; // skipping the suffix ? ignore blank
+        for (end = beg + 1; end < size && data[end] != '\n'; end++) {};
+        
+        for (i = end-1; i > beg; i--) {
+            if (data[i] != ' ') break;
+            else tmp += 1; // ignoring trailing blanck space
+            }
+        
+        end -= tmp; // trimming spaces and '<-'
         
         if (beg < end) {
+            
             hoedown_buffer_put(work, data + beg, end - beg);
+            parse_block(inter, doc, work->data, work->size);
+            beg = end + tmp;
             
-            parse_inline(work, doc, work->data, work->size);
-            
-            while (i <= end) {
-                if (work->data[i] == data[beg+i]) {
-                    work->data[i]=' ';
-                }
-                i++;
-            }
-            
-            beg = end+2;
         }
     }
     
-    
     if (doc->md.centerofline)
-        doc->md.centerofline(ob, work, &doc->data);
+        doc->md.centerofline(ob, inter, &doc->data);
     
     popbuf(doc, BUFFER_BLOCK);
+    popbuf(doc, BUFFER_SPAN);
     
     return beg;
 }
